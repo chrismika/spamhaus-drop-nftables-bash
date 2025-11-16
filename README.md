@@ -2,6 +2,7 @@
 Deploy Spamhaus' DROP list to Linux using bash and nftables
 
 # Usage
+```
 Usage: ./spamhaus-drop-nftables.sh [-h|--help] [-q|--quiet] [--jq-cmd PATH] [--nft-cmd PATH]
 
 Options:
@@ -11,3 +12,4 @@ Options:
                        (default: /usr/bin/jq)
       --nft-cmd PATH   Path to nft executable
                        (default: /usr/sbin/nft)
+```
