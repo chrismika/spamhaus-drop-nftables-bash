@@ -1,0 +1,217 @@
+#!/bin/bash
+set -uo pipefail
+
+# --- Global Constants ---
+readonly DEFAULT_NFT_CMD="/usr/sbin/nft"
+readonly DEFAULT_JQ_CMD="/usr/bin/jq"
+readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
+readonly TABLE_NAME="table-spamhaus-drop-list"
+readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
+readonly CHAIN_IN_NAME="chain-drop-list-in"
+readonly CHAIN_OUT_NAME="chain-drop-list-out"
+readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
+readonly DEBUG="true"
+readonly USAGE="Usage: $0 [-h|--help] [-q|--quiet]  [--jq-cmd PATH] [--nft-cmd PATH]"
+
+# --- Working variables (mutable) ---
+NFT_CMD="${DEFAULT_NFT_CMD}"
+JQ_CMD="${DEFAULT_JQ_CMD}"
+QUIET=false
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -q|--quiet)
+                QUIET=true
+                shift
+                ;;
+            --nft-cmd)
+                NFT_CMD="${2}"
+                shift 2
+                ;;
+            --jq-cmd)
+                JQ_CMD="${2}"
+                shift 2
+                ;;
+            -h|--help)
+                echo ${USAGE}
+                echo
+                echo "Options:"
+                echo "  -h, --help           Print this help message"
+                echo "  -q, --quiet          Suppress final success message"
+                echo "      --jq-cmd PATH    Path to jq executable"
+                echo "                       (default: $DEFAULT_JQ_CMD)"
+                echo "      --nft-cmd PATH   Path to nft executable"
+                echo "                       (default: $DEFAULT_NFT_CMD)"
+                exit 0
+                ;;
+            *)
+                echo "Unknown argument: ${1}"
+                echo ${USAGE}
+                exit 1
+                ;;
+        esac
+    done
+}
+
+error () {
+    local message=${1}
+    local error_message=${2}
+    echo -n "$(date "${LOG_DATE_FORMAT}") [error]: ${message}" >&2
+    if [[ "${DEBUG}" == "true" ]] && [[ -n "${error_message}" ]]; then
+        echo -n ": ${error_message}" >&2
+    fi
+    echo >&2
+    return 0
+}
+
+check_root () {
+    if [[ ${EUID} -ne 0 ]]; then
+        error "must be root"
+        return 1
+    fi
+    return 0
+}
+
+ensure_table () {
+    if ${NFT_CMD} list table inet "${TABLE_NAME}" >/dev/null 2>&1; then
+        return 0
+    else
+        local error_message
+        error_message=$(${NFT_CMD} add table inet "${TABLE_NAME}" 2>&1) || {
+            error "failed to add table ${TABLE_NAME}" "${error_message}"
+            return 1
+        }
+    fi
+    return 0
+}
+
+ensure_set () {
+  if ${NFT_CMD} list set inet "${TABLE_NAME}" "${SET_NAME}" >/dev/null 2>&1; then
+      return 0
+  else
+      local error_message
+      error_message=$(${NFT_CMD} add set inet "${TABLE_NAME}" "${SET_NAME}" \
+        "{ type ipv4_addr; flags interval; auto-merge; }" 2>&1) || {
+            error "failed to add set ${SET_NAME}" "${error_message}"
+            return 1
+        }
+  fi
+  return 0
+}
+
+populate_set () {
+    local curl_output
+    curl_output=$(curl -fSLs "${DROP_LIST_URL}" 2>&1) || {
+        error "failed to download ${DROP_LIST_URL}: ${curl_output}"
+        return 1
+    }
+    local error_message
+    error_message=$(${NFT_CMD} add element inet "${TABLE_NAME}" "${SET_NAME}" \
+      "{ $(printf "%s\n" "$curl_output" | grep -v "^;" | awk '{print $1}' | paste -sd "," -) }" 2>&1) || {
+        error "failed to add elements to set ${SET_NAME}" "${error_message}"
+        return 1
+      }
+    return 0
+}
+
+ensure_chain () {
+    local chain_name=${1}
+    local hook_point
+    case "$chain_name" in
+        *-in)
+            hook_point="input"
+            ;;
+        *-out)
+            hook_point="output"
+            ;;
+        *)
+            error "Invalid chain name format: ${chain_name}"
+            return 1
+            ;;
+    esac
+    local error_message
+    if ! ${NFT_CMD} list chain inet "${TABLE_NAME}" "${chain_name}" >/dev/null 2>&1; then
+        error_message=$(${NFT_CMD} add chain inet "${TABLE_NAME}" "${chain_name}" \
+          "{ type filter hook "${hook_point}" priority filter -1; policy accept; }" 2>&1) || {
+            error "failed to add chain ${chain_name}" "${error_message}"
+        }
+    fi
+    return 0
+}
+
+ensure_rule () {
+    local chain_name=${1}
+    local address
+    case "$chain_name" in
+        *-in)
+            address="s"
+            ;;
+        *-out)
+            address="d"
+            ;;
+        *)
+            error "Invalid chain name format: ${chain_name}"
+            return 1
+            ;;
+    esac
+    local filter="ip ${address}addr @${SET_NAME} drop"
+    if ! ${NFT_CMD} list chain inet "${TABLE_NAME}" "${chain_name}" 2>/dev/null | \
+      grep -q "${filter}"; then     
+        local error_message 
+        error_message=$(${NFT_CMD} add rule inet "${TABLE_NAME}" "${chain_name}" "${filter}" 2>&1) || {
+          error "failed to add rule to ${chain_name}" "${error_message}"
+          return 1
+        }
+    fi
+    return 0
+}
+
+delete_stale_rules () {
+    local chain_name=${1}
+    for i in $(${NFT_CMD} -j list chain inet "${TABLE_NAME}" "${chain_name}" | \
+      ${JQ_CMD} -r '.nftables[] | select(.rule) | 
+      select( all(.rule.expr[]?; .match.right != ("@" + "'"${SET_NAME}"'"))) | .rule.handle'); do
+        local error_message
+        error_message=$(${NFT_CMD} delete rule inet "${TABLE_NAME}" "${chain_name}" handle ${i}) || {
+          error "failed to delete rule handle ${i} from ${chain_name}" "${error_message}"
+          return 1
+        }
+    done
+    return 0
+}
+
+delete_stale_sets () {
+    for i in $(${NFT_CMD} -j list sets | ${JQ_CMD} -r '.nftables[] | select(.set) | select(.set.table == "'"${TABLE_NAME}"'")
+      | select(.set.name != "'"${SET_NAME}"'") | .set.handle'); do
+        local error_message
+        error_message=$(${NFT_CMD} delete set inet "${TABLE_NAME}" handle ${i}) || {
+          error "failed to delete set handle ${i}" "${error_message}"
+        }
+    done
+}
+
+main () {
+    # check if root
+    if ! check_root; then exit 1; fi
+    # ensure table exists
+    if ! ensure_table; then exit 1; fi
+    # ensure set
+    if ! ensure_set; then exit 1;fi
+    # populate set
+    if ! populate_set; then exit 1; fi
+    for i in CHAIN_IN_NAME CHAIN_OUT_NAME; do
+        # ensure chains exists
+        if ! ensure_chain "${!i}"; then exit 1; fi
+        # ensure rules exist
+        if ! ensure_rule "${!i}"; then exit 1; fi
+        # delete stale rules
+        if ! delete_stale_rules "${i}"; then exit 1; fi
+    done
+    # delete stale sets
+    if ! delete_stale_sets; then exit 1; fi
+    # print output
+    if ! $QUIET; then echo "${0} completed successfully (${SET_NAME})"; fi
+}
+parse_args "$@"   
+main
