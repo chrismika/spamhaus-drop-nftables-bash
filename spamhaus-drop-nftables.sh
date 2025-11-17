@@ -27,7 +27,7 @@ readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
 readonly CHAIN_IN_NAME="chain-drop-list-in"
 readonly CHAIN_OUT_NAME="chain-drop-list-out"
 readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
-readonly USAGE="Usage: $0 [-d|--debug] [-h|--help] [-q]  [--jq-cmd PATH] [--nft-cmd PATH]"
+readonly USAGE="Usage: $0 [-d|--debug] [-l] [-q] [--log-level] [--log-prefix] [--jq-cmd PATH] [--nft-cmd PATH] [-h|--help]"
 readonly LOG_LEVEL_OPTIONS=("emerg" "alert" "crit" "err" "warn" "notice" "info" "debug")
 
 # --- Logging Setup ---
@@ -40,12 +40,12 @@ parse_args() {
                 DEBUG="true"
                 shift
                 ;;
-            -q)
-                QUIET=true
-                shift
-                ;;
             -l)
                 LOG_FLAG=true
+                shift
+                ;;
+            -q)
+                QUIET=true
                 shift
                 ;;
             --log-level)
@@ -58,12 +58,12 @@ parse_args() {
                 if ! log_setup; then return 1; fi
                 shift 2
                 ;;
-            --nft-cmd)
-                NFT_CMD="${2}"
-                shift 2
-                ;;
             --jq-cmd)
                 JQ_CMD="${2}"
+                shift 2
+                ;;
+            --nft-cmd)
+                NFT_CMD="${2}"
                 shift 2
                 ;;
             -h|--help)
@@ -71,17 +71,17 @@ parse_args() {
                 echo
                 echo "Options:"
                 echo "  -d, --debug               Turn on debug for error messages"
-                echo "  -h, --help                Print this help message"
                 echo "  -l                        Log rule matches"
                 echo "  -q                        Suppress final success message"
-                echo "      --jq-cmd PATH         Path to jq executable"
-                echo "                            (default: $DEFAULT_JQ_CMD)"
                 echo "      --log-level LEVEL     Set the filter's log level"
                 echo "                            (default: ${DEFAULT_LOG_LEVEL})"
                 echo "      --log-prefix PREFIX   Set the filter's log prefix"
                 echo "                            (default: \"${DEFAULT_LOG_PREFIX%: }\")"
+                echo "      --jq-cmd PATH         Path to jq executable"
+                echo "                            (default: $DEFAULT_JQ_CMD)"
                 echo "      --nft-cmd PATH        Path to nft executable"
                 echo "                            (default: $DEFAULT_NFT_CMD)"
+                echo "  -h, --help                Print this help message"
                 return 1
                 ;;
             *)

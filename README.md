@@ -3,15 +3,21 @@ Deploy Spamhaus' DROP list to Linux using bash and nftables
 
 # Usage
 ```
-Usage: ./spamhaus-drop-nftables.sh [-h|--help] [-q|--quiet] [--jq-cmd PATH] [--nft-cmd PATH]
+Usage: ./spamhaus-drop-nftables.sh [-d|--debug] [-l] [-q] [--log-level] [--log-prefix] [--jq-cmd PATH] [--nft-cmd PATH] [-h|--help]
 
 Options:
-  -h, --help           Print this help message
-  -q, --quiet          Suppress final success message
-      --jq-cmd PATH    Path to jq executable
-                       (default: /usr/bin/jq)
-      --nft-cmd PATH   Path to nft executable
-                       (default: /usr/sbin/nft)
+  -d, --debug               Turn on debug for error messages
+  -l                        Log rule matches
+  -q                        Suppress final success message
+      --log-level LEVEL     Set the filter's log level
+                            (default: warn)
+      --log-prefix PREFIX   Set the filter's log prefix
+                            (default: "DROP_List_Block")
+      --jq-cmd PATH         Path to jq executable
+                            (default: /usr/bin/jq)
+      --nft-cmd PATH        Path to nft executable
+                            (default: /usr/sbin/nft)
+  -h, --help                Print this help message
 ```
 
 ## Disclaimer
