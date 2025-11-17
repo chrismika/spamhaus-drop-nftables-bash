@@ -4,45 +4,59 @@ set -uo pipefail
 # --- Parameter Defaults ---
 readonly DEFAULT_NFT_CMD="/usr/sbin/nft"
 readonly DEFAULT_JQ_CMD="/usr/bin/jq"
-readonly DEFAULT_LOG_PREFIX="DROP List: "
-readonly DEFAULT_LOG_LEVEL="warning"
+readonly DEFAULT_LOG_PREFIX="DROP_List_Block: "
+readonly DEFAULT_LOG_LEVEL="warn"
+readonly DEFAULT_DEBUG="false"
+readonly DEFAULT_QUIET="false"
+readonly DEFAULT_LOG_FLAG="false"
+
+# --- Working variables (mutable) ---
+NFT_CMD="${DEFAULT_NFT_CMD}"
+JQ_CMD="${DEFAULT_JQ_CMD}"
+LOG_PREFIX="${DEFAULT_LOG_PREFIX}"
+LOG_LEVEL="${DEFAULT_LOG_LEVEL}"
+DEBUG="${DEFAULT_DEBUG}"
+QUIET="${DEFAULT_QUIET}"
+LOG_FLAG="${DEFAULT_LOG_FLAG}"
 
 # --- Global Constants ---
-readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
+#readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
+readonly DROP_LIST_URL="https://data.seenothing.org/drop.txt"
 readonly TABLE_NAME="table-spamhaus-drop-list"
 readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
 readonly CHAIN_IN_NAME="chain-drop-list-in"
 readonly CHAIN_OUT_NAME="chain-drop-list-out"
 readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
-readonly DEBUG="true"
-readonly USAGE="Usage: $0 [-h|--help] [-q|]  [--jq-cmd PATH] [--nft-cmd PATH]"
+readonly USAGE="Usage: $0 [-d|--debug] [-h|--help] [-q]  [--jq-cmd PATH] [--nft-cmd PATH]"
+readonly LOG_LEVEL_OPTIONS=("emerg" "alert" "crit" "err" "warn" "notice" "info" "debug")
 
-# --- Working variables (mutable) ---
-NFT_CMD="${DEFAULT_NFT_CMD}"
-JQ_CMD="${DEFAULT_JQ_CMD}"
-QUIET=false
-LOG_PREFIX="${DEFAULT_LOG_PREFIX}"
-LOG_LEVEL="${LOG_LEVEL}"
-LOGGING=""
+# --- Logging Setup ---
+LOG_TXT="log prefix \"${LOG_PREFIX}\" level ${LOG_LEVEL}"
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "${1}" in
+            -d|--debug)
+                DEBUG="true"
+                shift
+                ;;
             -q)
                 QUIET=true
                 shift
                 ;;
             -l)
-                LOGGING=true
+                LOG_FLAG=true
                 shift
                 ;;
             --log-level)
-                log_setup "${LOG_LEVEL}" "${2}"
-                shift
+                LOG_LEVEL="${2}"
+                if ! log_setup; then return 1; fi
+                shift 2
                 ;;
             --log-prefix)
-                log_setup "${2}" "${LOG_PREFIX}"
-                shift
+                LOG_PREFIX="${2}"
+                if ! log_setup; then return 1; fi
+                shift 2
                 ;;
             --nft-cmd)
                 NFT_CMD="${2}"
@@ -56,32 +70,51 @@ parse_args() {
                 echo ${USAGE}
                 echo
                 echo "Options:"
-                echo "  -h, --help           Print this help message"
-                echo "  -q, --quiet          Suppress final success message"
-                echo "      --jq-cmd PATH    Path to jq executable"
-                echo "                       (default: $DEFAULT_JQ_CMD)"
-                echo "      --nft-cmd PATH   Path to nft executable"
-                echo "                       (default: $DEFAULT_NFT_CMD)"
-                exit 0
+                echo "  -d, --debug               Turn on debug for error messages"
+                echo "  -h, --help                Print this help message"
+                echo "  -l                        Log rule matches"
+                echo "  -q                        Suppress final success message"
+                echo "      --jq-cmd PATH         Path to jq executable"
+                echo "                            (default: $DEFAULT_JQ_CMD)"
+                echo "      --log-level LEVEL     Set the filter's log level"
+                echo "                            (default: ${DEFAULT_LOG_LEVEL})"
+                echo "      --log-prefix PREFIX   Set the filter's log prefix"
+                echo "                            (default: \"${DEFAULT_LOG_PREFIX%: }\")"
+                echo "      --nft-cmd PATH        Path to nft executable"
+                echo "                            (default: $DEFAULT_NFT_CMD)"
+                return 1
                 ;;
             *)
                 echo "Unknown argument: ${1}"
                 echo ${USAGE}
-                exit 1
+                return 1
                 ;;
         esac
     done
 }
 
+in_haystack() {
+    local needle="${1}"
+    shift
+    local haystack=("${@}")
+    for check in ${haystack[@]}; do
+        if [[ "${needle}" == "${check}" ]]; then return 0; fi
+    done
+    return 1
+}
+
 log_setup () {
-    local log_prefix="${1}"
-    local log_level="${2}"
-    LOGGING=" log prefix ${1} level ${2}"
+    if ! in_haystack "${LOG_LEVEL}" "${LOG_LEVEL_OPTIONS[@]}"; then
+        error "Unknown log level: ${LOG_LEVEL}"
+        return 1
+    fi
+    LOG_TXT="log prefix \"${LOG_PREFIX}: \" level ${LOG_LEVEL}"
+    return 0
 }
 
 error () {
-    local message=${1}
-    local error_message=${2}
+    local message="${1}"
+    local error_message="${2:-}"
     echo -n "$(date "${LOG_DATE_FORMAT}") [error]: ${message}" >&2
     if [[ "${DEBUG}" == "true" ]] && [[ -n "${error_message}" ]]; then
         echo -n ": ${error_message}" >&2
@@ -92,7 +125,7 @@ error () {
 
 check_root () {
     if [[ ${EUID} -ne 0 ]]; then
-        error "must be root"
+        error "Incorrect user: must be root"
         return 1
     fi
     return 0
@@ -165,10 +198,6 @@ ensure_chain () {
     return 0
 }
 
-ensure_logging_is_correct () {
-    :wq
-}
-
 ensure_rule () {
     local chain_name=${1}
     local address
@@ -184,10 +213,12 @@ ensure_rule () {
             return 1
             ;;
     esac
-    local filter="ip ${address}addr @${SET_NAME} drop"
+    local error_message
+    local filter="ip ${address}addr @${SET_NAME}"
+    local search_filter="${filter}( log( prefix \".*\")?( level .*)?)?"
+    if [[ "${LOG_FLAG}" == "true" ]]; then filter="${filter} ${LOG_TXT}"; fi
     if ! ${NFT_CMD} list chain inet "${TABLE_NAME}" "${chain_name}" 2>/dev/null | \
-      grep -q "${filter}"; then     
-        local error_message 
+      grep -qE "${search_filter} drop"; then 
         error_message=$(${NFT_CMD} add rule inet "${TABLE_NAME}" "${chain_name}" "${filter}" 2>&1) || {
           error "failed to add rule to ${chain_name}" "${error_message}"
           return 1
@@ -232,16 +263,15 @@ main () {
     for i in CHAIN_IN_NAME CHAIN_OUT_NAME; do
         # ensure chains exists
         if ! ensure_chain "${!i}"; then exit 1; fi
-        # logging rule setup/destruction
         # ensure rules exist
         if ! ensure_rule "${!i}"; then exit 1; fi
         # delete stale rules
-        if ! delete_stale_rules "${i}"; then exit 1; fi
+        if ! delete_stale_rules "${!i}"; then exit 1; fi
     done
     # delete stale sets
     if ! delete_stale_sets; then exit 1; fi
     # print output
     if ! $QUIET; then echo "${0} completed successfully (${SET_NAME})"; fi
 }
-parse_args "$@"   
+if ! parse_args "$@"; then exit 1; fi
 main
