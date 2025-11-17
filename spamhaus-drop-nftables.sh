@@ -56,7 +56,7 @@ parse_args() {
 
 error () {
     local message=${1}
-    local error_message=${2}
+    local error_message="${2:-}"
     echo -n "$(date "${LOG_DATE_FORMAT}") [error]: ${message}" >&2
     if [[ "${DEBUG}" == "true" ]] && [[ -n "${error_message}" ]]; then
         echo -n ": ${error_message}" >&2
@@ -169,7 +169,7 @@ ensure_rule () {
 
 delete_stale_rules () {
     local chain_name=${1}
-    for i in $(${NFT_CMD} -j list chain inet "${TABLE_NAME}" "${chain_name}" | \
+    for i in $(${NFT_CMD} -j list chain inet "${TABLE_NAME}" "${chain_name}" 2>/dev/null | \
       ${JQ_CMD} -r '.nftables[] | select(.rule) | 
       select( all(.rule.expr[]?; .match.right != ("@" + "'"${SET_NAME}"'"))) | .rule.handle'); do
         local error_message
@@ -206,7 +206,7 @@ main () {
         # ensure rules exist
         if ! ensure_rule "${!i}"; then exit 1; fi
         # delete stale rules
-        if ! delete_stale_rules "${i}"; then exit 1; fi
+        if ! delete_stale_rules "${!i}"; then exit 1; fi
     done
     # delete stale sets
     if ! delete_stale_sets; then exit 1; fi
