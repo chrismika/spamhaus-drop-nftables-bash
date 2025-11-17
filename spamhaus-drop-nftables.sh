@@ -229,7 +229,7 @@ ensure_rule () {
 
 delete_stale_rules () {
     local chain_name=${1}
-    for i in $(${NFT_CMD} -j list chain inet "${TABLE_NAME}" "${chain_name}" | \
+    for i in $(${NFT_CMD} -j list chain inet "${TABLE_NAME}" "${chain_name}" 2>/dev/null | \
       ${JQ_CMD} -r '.nftables[] | select(.rule) | 
       select( all(.rule.expr[]?; .match.right != ("@" + "'"${SET_NAME}"'"))) | .rule.handle'); do
         local error_message
