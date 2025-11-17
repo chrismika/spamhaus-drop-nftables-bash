@@ -1,9 +1,13 @@
 #!/bin/bash
 set -uo pipefail
 
-# --- Global Constants ---
+# --- Parameter Defaults ---
 readonly DEFAULT_NFT_CMD="/usr/sbin/nft"
 readonly DEFAULT_JQ_CMD="/usr/bin/jq"
+readonly DEFAULT_LOG_PREFIX="DROP List: "
+readonly DEFAULT_LOG_LEVEL="warning"
+
+# --- Global Constants ---
 readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
 readonly TABLE_NAME="table-spamhaus-drop-list"
 readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
@@ -11,18 +15,33 @@ readonly CHAIN_IN_NAME="chain-drop-list-in"
 readonly CHAIN_OUT_NAME="chain-drop-list-out"
 readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
 readonly DEBUG="true"
-readonly USAGE="Usage: $0 [-h|--help] [-q|--quiet]  [--jq-cmd PATH] [--nft-cmd PATH]"
+readonly USAGE="Usage: $0 [-h|--help] [-q|]  [--jq-cmd PATH] [--nft-cmd PATH]"
 
 # --- Working variables (mutable) ---
 NFT_CMD="${DEFAULT_NFT_CMD}"
 JQ_CMD="${DEFAULT_JQ_CMD}"
 QUIET=false
+LOG_PREFIX="${DEFAULT_LOG_PREFIX}"
+LOG_LEVEL="${LOG_LEVEL}"
+LOGGING=""
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -q|--quiet)
+        case "${1}" in
+            -q)
                 QUIET=true
+                shift
+                ;;
+            -l)
+                LOGGING=true
+                shift
+                ;;
+            --log-level)
+                log_setup "${LOG_LEVEL}" "${2}"
+                shift
+                ;;
+            --log-prefix)
+                log_setup "${2}" "${LOG_PREFIX}"
                 shift
                 ;;
             --nft-cmd)
@@ -52,6 +71,12 @@ parse_args() {
                 ;;
         esac
     done
+}
+
+log_setup () {
+    local log_prefix="${1}"
+    local log_level="${2}"
+    LOGGING=" log prefix ${1} level ${2}"
 }
 
 error () {
@@ -118,7 +143,7 @@ populate_set () {
 ensure_chain () {
     local chain_name=${1}
     local hook_point
-    case "$chain_name" in
+    case "${chain_name}" in
         *-in)
             hook_point="input"
             ;;
@@ -140,10 +165,14 @@ ensure_chain () {
     return 0
 }
 
+ensure_logging_is_correct () {
+    :wq
+}
+
 ensure_rule () {
     local chain_name=${1}
     local address
-    case "$chain_name" in
+    case "${chain_name}" in
         *-in)
             address="s"
             ;;
@@ -203,6 +232,7 @@ main () {
     for i in CHAIN_IN_NAME CHAIN_OUT_NAME; do
         # ensure chains exists
         if ! ensure_chain "${!i}"; then exit 1; fi
+        # logging rule setup/destruction
         # ensure rules exist
         if ! ensure_rule "${!i}"; then exit 1; fi
         # delete stale rules
