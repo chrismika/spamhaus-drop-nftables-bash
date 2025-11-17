@@ -13,3 +13,8 @@ Options:
       --nft-cmd PATH   Path to nft executable
                        (default: /usr/sbin/nft)
 ```
+
+## Disclaimer
+The authors of this script are not affiliated with Spamhaus and are providing the script as a convenient wrapper for integrating the publicly available list.
+
+Spamhaus DROP List (c) 2025 The Spamhaus Project SLU
