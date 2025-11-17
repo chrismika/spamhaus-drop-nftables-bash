@@ -20,8 +20,7 @@ QUIET="${DEFAULT_QUIET}"
 LOG_FLAG="${DEFAULT_LOG_FLAG}"
 
 # --- Global Constants ---
-#readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
-readonly DROP_LIST_URL="https://data.seenothing.org/drop.txt"
+readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
 readonly TABLE_NAME="table-spamhaus-drop-list"
 readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
 readonly CHAIN_IN_NAME="chain-drop-list-in"
