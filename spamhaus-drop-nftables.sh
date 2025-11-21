@@ -4,7 +4,7 @@ set -uo pipefail
 # --- Parameter Defaults ---
 readonly DEFAULT_NFT_CMD="/usr/sbin/nft"
 readonly DEFAULT_JQ_CMD="/usr/bin/jq"
-readonly DEFAULT_LOG_PREFIX="DROP_List_Block: "
+readonly DEFAULT_LOG_PREFIX="DROP_List_Block "
 readonly DEFAULT_LOG_LEVEL="warn"
 readonly DEFAULT_DEBUG="false"
 readonly DEFAULT_QUIET="false"
@@ -75,7 +75,7 @@ parse_args() {
                 echo "      --log-level LEVEL     Set the filter's log level"
                 echo "                            (default: ${DEFAULT_LOG_LEVEL})"
                 echo "      --log-prefix PREFIX   Set the filter's log prefix"
-                echo "                            (default: \"${DEFAULT_LOG_PREFIX%: }\")"
+                echo "                            (default: \"${DEFAULT_LOG_PREFIX% }\")"
                 echo "      --jq-cmd PATH         Path to jq executable"
                 echo "                            (default: $DEFAULT_JQ_CMD)"
                 echo "      --nft-cmd PATH        Path to nft executable"
