@@ -218,7 +218,7 @@ ensure_rule () {
     if [[ "${LOG_FLAG}" == "true" ]]; then filter="${filter} ${LOG_TXT}"; fi
     if ! ${NFT_CMD} list chain inet "${TABLE_NAME}" "${chain_name}" 2>/dev/null | \
       grep -qE "${search_filter} drop"; then 
-        error_message=$(${NFT_CMD} add rule inet "${TABLE_NAME}" "${chain_name}" "${filter}" 2>&1) || {
+        error_message=$(${NFT_CMD} add rule inet "${TABLE_NAME}" "${chain_name}" "${filter}" drop 2>&1) || {
           error "failed to add rule to ${chain_name}" "${error_message}"
           return 1
         }
