@@ -10,7 +10,7 @@ readonly DEFAULT_DEBUG="false"
 readonly DEFAULT_QUIET="false"
 readonly DEFAULT_LOG_FLAG="false"
 
-# --- Working variables (mutable) ---
+# --- Working Variables (mutable) ---
 NFT_CMD="${DEFAULT_NFT_CMD}"
 JQ_CMD="${DEFAULT_JQ_CMD}"
 LOG_PREFIX="${DEFAULT_LOG_PREFIX}"
