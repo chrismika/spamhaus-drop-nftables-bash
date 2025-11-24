@@ -29,7 +29,7 @@ readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
 readonly USAGE="Usage: $0 [-d|--debug] [-l] [-q] [--log-level] [--log-prefix] [--jq-cmd PATH] [--nft-cmd PATH] [-h|--help]"
 readonly LOG_LEVEL_OPTIONS=("emerg" "alert" "crit" "err" "warn" "notice" "info" "debug")
 
-# --- Logging Setup ---
+# --- nftables Logging Setup ---
 LOG_TXT="log prefix \"${LOG_PREFIX}\" level ${LOG_LEVEL}"
 
 parse_args() {
