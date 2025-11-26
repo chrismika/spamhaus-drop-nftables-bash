@@ -120,9 +120,17 @@ error () {
     echo >&2
 }
 
-check_root () {
+check_requirements () {
     if [[ ${EUID} -ne 0 ]]; then
         error "Incorrect user: must be root"
+        return 1
+    fi
+    if ! command -v ${NFT_CMD} >/dev/null 2>&1; then
+        error "nft command not present"
+        return 1
+    fi
+    if ! command -v ${JQ_CMD} >/dev/null 2>&1; then
+        error "jq command not present"
         return 1
     fi
 }
@@ -251,7 +259,7 @@ delete_stale_sets () {
 
 main () {
     # check if root
-    if ! check_root; then exit 1; fi
+    if ! check_requirements; then exit 1; fi
     # ensure table exists
     if ! ensure_table; then exit 1; fi
     # ensure set
