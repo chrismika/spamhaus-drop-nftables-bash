@@ -128,7 +128,7 @@ check_root () {
 }
 
 ensure_table () {
-    if ${NFT_CMD} list table inet "${TABLE_NAME}" >/dev/null 2&>1; then
+    if ${NFT_CMD} list table inet "${TABLE_NAME}" >/dev/null 2>&1; then
         return 0
     else
         local error_message
@@ -141,7 +141,7 @@ ensure_table () {
 }
 
 ensure_set () {
-  if ${NFT_CMD} list set inet "${TABLE_NAME}" "${SET_NAME}" >/dev/null 2&>1; then
+  if ${NFT_CMD} list set inet "${TABLE_NAME}" "${SET_NAME}" >/dev/null 2>&1; then
       return 0
   else
       local error_message
@@ -186,7 +186,7 @@ ensure_chain () {
             ;;
     esac
     local error_message
-    if ! ${NFT_CMD} list chain inet "${TABLE_NAME}" "${chain_name}" >/dev/null 2&>1; then
+    if ! ${NFT_CMD} list chain inet "${TABLE_NAME}" "${chain_name}" >/dev/null 2>&1; then
         error_message=$(${NFT_CMD} add chain inet "${TABLE_NAME}" "${chain_name}" \
           "{ type filter hook ${hook_point} priority filter -1; policy accept; }" 2>&1 >/dev/null) 
         if [[ $? -ne 0 ]]; then
