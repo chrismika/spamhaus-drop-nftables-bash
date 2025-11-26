@@ -6,18 +6,18 @@ readonly DEFAULT_NFT_CMD="/usr/sbin/nft"
 readonly DEFAULT_JQ_CMD="/usr/bin/jq"
 readonly DEFAULT_LOG_PREFIX="DROP_List_Block "
 readonly DEFAULT_LOG_LEVEL="warn"
-readonly DEFAULT_DEBUG="false"
-readonly DEFAULT_QUIET="false"
-readonly DEFAULT_LOG_FLAG="false"
+readonly DEFAULT_DEBUG=false
+readonly DEFAULT_QUIET=false
+readonly DEFAULT_LOG_FLAG=false
 
 # --- Working Variables (mutable) ---
 NFT_CMD="${DEFAULT_NFT_CMD}"
 JQ_CMD="${DEFAULT_JQ_CMD}"
 LOG_PREFIX="${DEFAULT_LOG_PREFIX}"
 LOG_LEVEL="${DEFAULT_LOG_LEVEL}"
-DEBUG="${DEFAULT_DEBUG}"
-QUIET="${DEFAULT_QUIET}"
-LOG_FLAG="${DEFAULT_LOG_FLAG}"
+DEBUG=${DEFAULT_DEBUG}
+QUIET=${DEFAULT_QUIET}
+LOG_FLAG=${DEFAULT_LOG_FLAG}
 
 # --- Global Constants ---
 readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
@@ -36,7 +36,7 @@ parse_args() {
     while [[ $# -gt 0 ]]; do
         case "${1}" in
             -d|--debug)
-                DEBUG="true"
+                DEBUG=true
                 shift
                 ;;
             -l)
@@ -66,7 +66,7 @@ parse_args() {
                 shift 2
                 ;;
             -h|--help)
-                echo ${USAGE}
+                echo "${USAGE}"
                 echo
                 echo "Options:"
                 echo "  -d, --debug               Turn on debug for error messages"
@@ -85,7 +85,7 @@ parse_args() {
                 ;;
             *)
                 echo "Unknown argument: ${1}"
-                echo ${USAGE}
+                echo "${USAGE}"
                 return 1
                 ;;
         esac
@@ -96,7 +96,7 @@ in_haystack() {
     local needle="${1}"
     shift
     local haystack=("${@}")
-    for check in ${haystack[@]}; do
+    for check in "${haystack[@]}"; do
         if [[ "${needle}" == "${check}" ]]; then return 0; fi
     done
     return 1
@@ -108,18 +108,16 @@ log_setup () {
         return 1
     fi
     LOG_TXT="log prefix \"${LOG_PREFIX}: \" level ${LOG_LEVEL}"
-    return 0
 }
 
 error () {
     local message="${1}"
     local error_message="${2:-}"
     echo -n "$(date "${LOG_DATE_FORMAT}") [error]: ${message}" >&2
-    if [[ "${DEBUG}" == "true" ]] && [[ -n "${error_message}" ]]; then
+    if ${DEBUG} && [[ -n "${error_message}" ]]; then
         echo -n ": ${error_message}" >&2
     fi
     echo >&2
-    return 0
 }
 
 check_root () {
@@ -127,7 +125,6 @@ check_root () {
         error "Incorrect user: must be root"
         return 1
     fi
-    return 0
 }
 
 ensure_table () {
@@ -135,12 +132,12 @@ ensure_table () {
         return 0
     else
         local error_message
-        error_message=$(${NFT_CMD} add table inet "${TABLE_NAME}" 2>&1) || {
+        error_message=$(${NFT_CMD} add table inet "${TABLE_NAME}" 2>&1 >/dev/null)
+        if [[ $? -ne 0 ]]; then
             error "failed to add table ${TABLE_NAME}" "${error_message}"
             return 1
-        }
+        fi
     fi
-    return 0
 }
 
 ensure_set () {
@@ -149,27 +146,28 @@ ensure_set () {
   else
       local error_message
       error_message=$(${NFT_CMD} add set inet "${TABLE_NAME}" "${SET_NAME}" \
-        "{ type ipv4_addr; flags interval; auto-merge; }" 2>&1) || {
+        "{ type ipv4_addr; flags interval; auto-merge; }" 2>&1 >/dev/null)
+        if [[ $? -ne 0 ]]; then
             error "failed to add set ${SET_NAME}" "${error_message}"
             return 1
-        }
+        fi
   fi
-  return 0
 }
 
 populate_set () {
     local curl_output
-    curl_output=$(curl -fSLs "${DROP_LIST_URL}" 2>&1) || {
+    curl_output=$(curl -fSLs "${DROP_LIST_URL}" 2>&1) 
+    if [[ $? -ne 0 ]]; then
         error "failed to download ${DROP_LIST_URL}: ${curl_output}"
         return 1
-    }
+    fi
     local error_message
     error_message=$(${NFT_CMD} add element inet "${TABLE_NAME}" "${SET_NAME}" \
-      "{ $(printf "%s\n" "$curl_output" | grep -v "^;" | awk '{print $1}' | paste -sd "," -) }" 2>&1) || {
+      "{ $(printf "%s\n" "$curl_output" | grep -v "^;" | awk '{print $1}' | paste -sd "," -) }" 2>&1 >/dev/null)
+    if [[ $? -ne 0 ]]; then
         error "failed to add elements to set ${SET_NAME}" "${error_message}"
         return 1
-      }
-    return 0
+    fi
 }
 
 ensure_chain () {
@@ -190,11 +188,11 @@ ensure_chain () {
     local error_message
     if ! ${NFT_CMD} list chain inet "${TABLE_NAME}" "${chain_name}" >/dev/null 2>&1; then
         error_message=$(${NFT_CMD} add chain inet "${TABLE_NAME}" "${chain_name}" \
-          "{ type filter hook "${hook_point}" priority filter -1; policy accept; }" 2>&1) || {
+          "{ type filter hook ${hook_point} priority filter -1; policy accept; }" 2>&1 >/dev/null) 
+        if [[ $? -ne 0 ]]; then
             error "failed to add chain ${chain_name}" "${error_message}"
-        }
+        fi
     fi
-    return 0
 }
 
 ensure_rule () {
@@ -218,12 +216,12 @@ ensure_rule () {
     if [[ "${LOG_FLAG}" == "true" ]]; then filter="${filter} ${LOG_TXT}"; fi
     if ! ${NFT_CMD} list chain inet "${TABLE_NAME}" "${chain_name}" 2>/dev/null | \
       grep -qE "${search_filter} drop"; then 
-        error_message=$(${NFT_CMD} add rule inet "${TABLE_NAME}" "${chain_name}" "${filter}" drop 2>&1) || {
+        error_message=$(${NFT_CMD} add rule inet "${TABLE_NAME}" "${chain_name}" "${filter}" drop 2>&1 >/dev/null)
+        if [[ $? -ne 0 ]]; then
           error "failed to add rule to ${chain_name}" "${error_message}"
           return 1
-        }
+        fi
     fi
-    return 0
 }
 
 delete_stale_rules () {
@@ -232,21 +230,22 @@ delete_stale_rules () {
       ${JQ_CMD} -r '.nftables[] | select(.rule) | 
       select( all(.rule.expr[]?; .match.right != ("@" + "'"${SET_NAME}"'"))) | .rule.handle'); do
         local error_message
-        error_message=$(${NFT_CMD} delete rule inet "${TABLE_NAME}" "${chain_name}" handle ${i}) || {
+        error_message=$(${NFT_CMD} delete rule inet "${TABLE_NAME}" "${chain_name}" handle "${i}" 2>&1 >/dev/null)
+        if [[ $? -ne 0 ]]; then
           error "failed to delete rule handle ${i} from ${chain_name}" "${error_message}"
           return 1
-        }
+        fi
     done
-    return 0
 }
 
 delete_stale_sets () {
     for i in $(${NFT_CMD} -j list sets | ${JQ_CMD} -r '.nftables[] | select(.set) | select(.set.table == "'"${TABLE_NAME}"'")
       | select(.set.name != "'"${SET_NAME}"'") | .set.handle'); do
         local error_message
-        error_message=$(${NFT_CMD} delete set inet "${TABLE_NAME}" handle ${i}) || {
+        error_message=$(${NFT_CMD} delete set inet "${TABLE_NAME}" handle "${i}" 2>&1 >/dev/null) 
+        if [[ $? -ne 0 ]]; then
           error "failed to delete set handle ${i}" "${error_message}"
-        }
+        fi
     done
 }
 
@@ -259,13 +258,13 @@ main () {
     if ! ensure_set; then exit 1;fi
     # populate set
     if ! populate_set; then exit 1; fi
-    for i in CHAIN_IN_NAME CHAIN_OUT_NAME; do
+    for i in "${CHAIN_IN_NAME}" "${CHAIN_OUT_NAME}"; do
         # ensure chains exists
-        if ! ensure_chain "${!i}"; then exit 1; fi
+        if ! ensure_chain "${i}"; then exit 1; fi
         # ensure rules exist
-        if ! ensure_rule "${!i}"; then exit 1; fi
+        if ! ensure_rule "${i}"; then exit 1; fi
         # delete stale rules
-        if ! delete_stale_rules "${!i}"; then exit 1; fi
+        if ! delete_stale_rules "${i}"; then exit 1; fi
     done
     # delete stale sets
     if ! delete_stale_sets; then exit 1; fi
