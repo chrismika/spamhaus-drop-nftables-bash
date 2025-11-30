@@ -1,6 +1,7 @@
 [Unit]
 Description=Downloads and blocks the contents of spamhaus' DROP list using nftables
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
