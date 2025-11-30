@@ -53,3 +53,4 @@ uninstall:
 	@echo "Uninstallation complete."
 
 .PHONY: all install uninstall
+

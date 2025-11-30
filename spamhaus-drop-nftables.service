@@ -8,3 +8,4 @@ ExecStart=/usr/local/sbin/spamhaus-drop-nftables.sh
 
 [Install]
 WantedBy=multi-user.target
+
