@@ -101,9 +101,11 @@ in_haystack() {
 }
 
 log_setup () {
-    if ! in_haystack "${LOG_LEVEL}" "${LOG_LEVEL_OPTIONS[@]}"; then
-        error "Unknown log level: ${LOG_LEVEL}"
-        return 1
+    if [[ "${LOG_LEVEL}" != "${DEFAULT_LOG_LEVEL}" ]]; then
+        if ! in_haystack "${LOG_LEVEL}" "${LOG_LEVEL_OPTIONS[@]}"; then
+            error "Unknown log level: ${LOG_LEVEL}"
+            return 1
+        fi
     fi
     LOG_TXT="log prefix \"${LOG_PREFIX} \" level ${LOG_LEVEL}"
 }
@@ -258,7 +260,7 @@ delete_stale_sets () {
 main () {
     if ! check_requirements; then exit 1; fi
     if ! ensure_table; then exit 1; fi
-    if ! ensure_set; then exit 1;fi
+    if ! ensure_set; then exit 1; fi
     if ! populate_set; then exit 1; fi
     for i in "${CHAIN_IN_NAME}" "${CHAIN_OUT_NAME}"; do
         if ! ensure_chain "${i}"; then exit 1; fi
