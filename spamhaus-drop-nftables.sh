@@ -256,25 +256,16 @@ delete_stale_sets () {
 }
 
 main () {
-    # check if root
     if ! check_requirements; then exit 1; fi
-    # ensure table exists
     if ! ensure_table; then exit 1; fi
-    # ensure set
     if ! ensure_set; then exit 1;fi
-    # populate set
     if ! populate_set; then exit 1; fi
     for i in "${CHAIN_IN_NAME}" "${CHAIN_OUT_NAME}"; do
-        # ensure chains exists
         if ! ensure_chain "${i}"; then exit 1; fi
-        # ensure rules exist
         if ! ensure_rule "${i}"; then exit 1; fi
-        # delete stale rules
         if ! delete_stale_rules "${i}"; then exit 1; fi
     done
-    # delete stale sets
     if ! delete_stale_sets; then exit 1; fi
-    # print output
     if ! $QUIET; then echo "${0} completed successfully (${SET_NAME})"; fi
 }
 if ! parse_args "$@"; then exit 1; fi
