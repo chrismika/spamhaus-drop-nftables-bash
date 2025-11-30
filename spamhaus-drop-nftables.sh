@@ -258,7 +258,7 @@ delete_stale_sets () {
 main () {
     if ! check_requirements; then exit 1; fi
     if ! ensure_table; then exit 1; fi
-    if ! ensure_set; then exit 1;fi
+    if ! ensure_set; then exit 1; fi
     if ! populate_set; then exit 1; fi
     for i in "${CHAIN_IN_NAME}" "${CHAIN_OUT_NAME}"; do
         if ! ensure_chain "${i}"; then exit 1; fi
