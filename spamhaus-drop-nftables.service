@@ -1,0 +1,11 @@
+[Unit]
+Description=Downloads and blocks the contents of spamhaus' DROP list using nftables
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/spamhaus-drop-nftables.sh
+
+[Install]
+WantedBy=multi-user.target
+
