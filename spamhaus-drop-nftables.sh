@@ -101,9 +101,11 @@ in_haystack() {
 }
 
 log_setup () {
-    if ! in_haystack "${LOG_LEVEL}" "${LOG_LEVEL_OPTIONS[@]}"; then
-        error "Unknown log level: ${LOG_LEVEL}"
-        return 1
+    if [[ "${LOG_LEVEL}" != "${DEFAULT_LOG_LEVEL}" ]]; then
+        if ! in_haystack "${LOG_LEVEL}" "${LOG_LEVEL_OPTIONS[@]}"; then
+            error "Unknown log level: ${LOG_LEVEL}"
+            return 1
+        fi
     fi
     LOG_TXT="log prefix \"${LOG_PREFIX} \" level ${LOG_LEVEL}"
 }
