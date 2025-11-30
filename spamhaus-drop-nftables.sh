@@ -4,7 +4,7 @@ set -uo pipefail
 # --- Parameter Defaults ---
 readonly DEFAULT_NFT_CMD="/usr/sbin/nft"
 readonly DEFAULT_JQ_CMD="/usr/bin/jq"
-readonly DEFAULT_LOG_PREFIX="DROP_List_Block "
+readonly DEFAULT_LOG_PREFIX="DROP_List_Block"
 readonly DEFAULT_LOG_LEVEL="warn"
 readonly DEFAULT_DEBUG=false
 readonly DEFAULT_QUIET=false
@@ -29,9 +29,6 @@ readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
 readonly USAGE="Usage: $0 [-d|--debug] [-l] [-q] [--log-level] [--log-prefix] [--jq-cmd PATH] [--nft-cmd PATH] [-h|--help]"
 readonly LOG_LEVEL_OPTIONS=("emerg" "alert" "crit" "err" "warn" "notice" "info" "debug")
 
-# --- nftables Logging Setup ---
-LOG_TXT="log prefix \"${LOG_PREFIX}\" level ${LOG_LEVEL}"
-
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "${1}" in
@@ -41,6 +38,7 @@ parse_args() {
                 ;;
             -l)
                 LOG_FLAG=true
+                if ! log_setup; then return 1; fi
                 shift
                 ;;
             -q)
@@ -75,7 +73,7 @@ parse_args() {
                 echo "      --log-level LEVEL     Set the filter's log level"
                 echo "                            (default: ${DEFAULT_LOG_LEVEL})"
                 echo "      --log-prefix PREFIX   Set the filter's log prefix"
-                echo "                            (default: \"${DEFAULT_LOG_PREFIX% }\")"
+                echo "                            (default: \"${DEFAULT_LOG_PREFIX}\")"
                 echo "      --jq-cmd PATH         Path to jq executable"
                 echo "                            (default: $DEFAULT_JQ_CMD)"
                 echo "      --nft-cmd PATH        Path to nft executable"
@@ -107,7 +105,7 @@ log_setup () {
         error "Unknown log level: ${LOG_LEVEL}"
         return 1
     fi
-    LOG_TXT="log prefix \"${LOG_PREFIX}: \" level ${LOG_LEVEL}"
+    LOG_TXT="log prefix \"${LOG_PREFIX} \" level ${LOG_LEVEL}"
 }
 
 error () {
@@ -221,7 +219,7 @@ ensure_rule () {
     local error_message
     local filter="ip ${address}addr @${SET_NAME}"
     local search_filter="${filter}( log( prefix \".*\")?( level .*)?)?"
-    if [[ "${LOG_FLAG}" == "true" ]]; then filter="${filter} ${LOG_TXT}"; fi
+    if ${LOG_FLAG}; then filter="${filter} ${LOG_TXT}"; fi
     if ! ${NFT_CMD} list chain inet "${TABLE_NAME}" "${chain_name}" 2>/dev/null | \
       grep -qE "${search_filter} drop"; then 
         error_message=$(${NFT_CMD} add rule inet "${TABLE_NAME}" "${chain_name}" "${filter}" drop 2>&1 >/dev/null)
