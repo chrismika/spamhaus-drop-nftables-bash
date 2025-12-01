@@ -3,7 +3,7 @@ Deploy Spamhaus' DROP list to Linux using bash and nftables
 
 # Usage
 ```
-Usage: ./spamhaus-drop-nftables.sh [-d] [-l] [-q] [--curl-cmd PATH] [--log-level] [--log-prefix] [--jq-cmd PATH] [--max-retry INT] [--nft-cmd PATH] [--retry-delay INT] [-h|--help]
+Usage: ./spamhaus-drop-nftables.sh [-d] [-l] [-q] [--curl-cmd] [--log-level] [--log-prefix] [--jq-cmd] [--max-retry] [--nft-cmd] [--retry-delay] [-h|--help]
 
 Options:
   -d                        Turn on debug for error messages
