@@ -9,6 +9,8 @@ readonly DEFAULT_LOG_LEVEL="warn"
 readonly DEFAULT_DEBUG=false
 readonly DEFAULT_QUIET=false
 readonly DEFAULT_LOG_FLAG=false
+readonly DEFAULT_CURL_MAX_RETRIES=5
+readonly DEFAULT_CURL_RETRY_DELAY=5
 
 # --- Working Variables (mutable) ---
 NFT_CMD="${DEFAULT_NFT_CMD}"
@@ -18,15 +20,18 @@ LOG_LEVEL="${DEFAULT_LOG_LEVEL}"
 DEBUG=${DEFAULT_DEBUG}
 QUIET=${DEFAULT_QUIET}
 LOG_FLAG=${DEFAULT_LOG_FLAG}
+CURL_MAX_RETRIES=${DEFAULT_CURL_MAX_RETRIES}
+CURL_RETRY_DELAY=${DEFAULT_CURL_RETRY_DELAY}
 
 # --- Global Constants ---
-readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
+#readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
+readonly DROP_LIST_URL="https://data.seenothing.org/drop/drop.txt"
 readonly TABLE_NAME="table-spamhaus-drop-list"
 readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
 readonly CHAIN_IN_NAME="chain-drop-list-in"
 readonly CHAIN_OUT_NAME="chain-drop-list-out"
 readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
-readonly USAGE="Usage: $0 [-d|--debug] [-l] [-q] [--log-level] [--log-prefix] [--jq-cmd PATH] [--nft-cmd PATH] [-h|--help]"
+readonly USAGE="Usage: $0 [-d|--debug] [-l] [-q] [--curl-max-retry] [--curl-retry-delay] [--log-level] [--log-prefix] [--jq-cmd PATH] [--nft-cmd PATH] [-h|--help]"
 readonly LOG_LEVEL_OPTIONS=("emerg" "alert" "crit" "err" "warn" "notice" "info" "debug")
 
 parse_args() {
@@ -55,6 +60,22 @@ parse_args() {
                 if ! log_setup; then return 1; fi
                 shift 2
                 ;;
+            --curl-max-retry)
+                if [[ ! "${2}" =~ ^[0-9]+$ ]]; then
+                    error "--curl-max-retry must be a non-negative integer"
+                    return 1
+                fi
+                CURL_MAX_RETRIES="${2}"
+                shift 2
+                ;;
+            --curl-retry-delay)
+                if [[ ! "${2}" =~ ^[1-9][0-9]*$ ]]; then
+                    error "--curl-retry-delay must be a positive integer"
+                    return 1
+                fi
+                CURL_RETRY_DELAY="${2}"
+                shift 2
+                ;;
             --jq-cmd)
                 JQ_CMD="${2}"
                 shift 2
@@ -67,18 +88,22 @@ parse_args() {
                 echo "${USAGE}"
                 echo
                 echo "Options:"
-                echo "  -d, --debug               Turn on debug for error messages"
-                echo "  -l                        Log rule matches"
-                echo "  -q                        Suppress final success message"
-                echo "      --log-level LEVEL     Set the filter's log level"
-                echo "                            (default: ${DEFAULT_LOG_LEVEL})"
-                echo "      --log-prefix PREFIX   Set the filter's log prefix"
-                echo "                            (default: \"${DEFAULT_LOG_PREFIX}\")"
-                echo "      --jq-cmd PATH         Path to jq executable"
-                echo "                            (default: $DEFAULT_JQ_CMD)"
-                echo "      --nft-cmd PATH        Path to nft executable"
-                echo "                            (default: $DEFAULT_NFT_CMD)"
-                echo "  -h, --help                Print this help message"
+                echo "  -d, --debug                 Turn on debug for error messages"
+                echo "  -l                          Log rule matches"
+                echo "  -q                          Suppress final success message"
+                echo "      --curl-max-retry INT    Set the max attempts for curl to download list"
+                echo "                              (default: ${DEFAULT_CURL_MAX_RETRIES})"
+                echo "      --curl-retry-delay INT  Set the the delay between curl attempts"
+                echo "                              (default: ${DEFAULT_CURL_MAX_RETRIES})"
+                echo "      --log-level LEVEL       Set the filter's log level"
+                echo "                              (default: ${DEFAULT_LOG_LEVEL})"
+                echo "      --log-prefix PREFIX     Set the filter's log prefix"
+                echo "                              (default: \"${DEFAULT_LOG_PREFIX}\")"
+                echo "      --jq-cmd PATH           Path to jq executable"
+                echo "                              (default: $DEFAULT_JQ_CMD)"
+                echo "      --nft-cmd PATH          Path to nft executable"
+                echo "                              (default: $DEFAULT_NFT_CMD)"
+                echo "  -h, --help                  Print this help message"
                 return 1
                 ;;
             *)
@@ -164,11 +189,20 @@ ensure_set () {
 
 populate_set () {
     local curl_output
-    curl_output=$(curl -fSLs "${DROP_LIST_URL}" 2>&1) 
-    if [[ $? -ne 0 ]]; then
-        error "failed to download ${DROP_LIST_URL}: ${curl_output}"
-        return 1
-    fi
+    for ((i = 0; i < CURL_MAX_RETRIES; i++)); do
+    echo $i
+        curl_output=$(curl -fSLs "${DROP_LIST_URL}" 2>&1) 
+        if [[ $? -ne 0 ]]; then
+            if [[ ${i} -eq $((CURL_MAX_RETRIES - 1)) ]]; then
+                error "failed to download ${DROP_LIST_URL}: ${curl_output}"
+                return 1
+            else
+                sleep "${CURL_RETRY_DELAY}"
+            fi
+        else
+            break
+        fi
+    done
     local error_message
     error_message=$(${NFT_CMD} add element inet "${TABLE_NAME}" "${SET_NAME}" \
       "{ $(printf "%s\n" "$curl_output" | grep -v "^;" | awk '{print $1}' | paste -sd "," -) }" 2>&1 >/dev/null)
