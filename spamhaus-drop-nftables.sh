@@ -32,13 +32,13 @@ readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
 readonly CHAIN_IN_NAME="chain-drop-list-in"
 readonly CHAIN_OUT_NAME="chain-drop-list-out"
 readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
-readonly USAGE="Usage: $0 [-d|--debug] [-l] [-q] [--curl-cmd PATH] [--log-level] [--log-prefix] [--jq-cmd PATH] [--max-retry INT] [--nft-cmd PATH] [--retry-delay INT] [-h|--help]"
+readonly USAGE="Usage: $0 [-d] [-l] [-q] [--curl-cmd PATH] [--log-level] [--log-prefix] [--jq-cmd PATH] [--max-retry INT] [--nft-cmd PATH] [--retry-delay INT] [-h|--help]"
 readonly LOG_LEVEL_OPTIONS=("emerg" "alert" "crit" "err" "warn" "notice" "info" "debug")
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "${1}" in
-            -d|--debug)
+            -d)
                 DEBUG=true
                 shift
                 ;;
@@ -94,7 +94,7 @@ parse_args() {
                 echo "${USAGE}"
                 echo
                 echo "Options:"
-                echo "  -d, --debug               Turn on debug for error messages"
+                echo "  -d                        Turn on debug for error messages"
                 echo "  -l                        Log rule matches"
                 echo "  -q                        Suppress final success message"
                 echo "      --curl-cmd PATH       Path to curl executable"
@@ -104,9 +104,13 @@ parse_args() {
                 echo "      --log-prefix PREFIX   Set the filter's log prefix"
                 echo "                            (default: \"${DEFAULT_LOG_PREFIX}\")"
                 echo "      --jq-cmd PATH         Path to jq executable"
-                echo "                            (default: $DEFAULT_JQ_CMD)"
+                echo "                            (default: ${DEFAULT_JQ_CMD})"
+                echo "      --max-retry INT       Set the max number of download retries"
+                echo "                            (default: ${DEFAULT_MAX_RETRY})"
                 echo "      --nft-cmd PATH        Path to nft executable"
-                echo "                            (default: $DEFAULT_NFT_CMD)"
+                echo "                            (default: ${DEFAULT_NFT_CMD})"
+                echo "      --retry-delay INT     Set the delay between download retries"
+                echo "                            (default: ${DEFAULT_RETRY_DELAY})"
                 echo "  -h, --help                Print this help message"
                 return 1
                 ;;
