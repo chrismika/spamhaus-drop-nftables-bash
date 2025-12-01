@@ -3,12 +3,14 @@ Deploy Spamhaus' DROP list to Linux using bash and nftables
 
 # Usage
 ```
-Usage: ./spamhaus-drop-nftables.sh [-d|--debug] [-l] [-q] [--log-level] [--log-prefix] [--jq-cmd PATH] [--nft-cmd PATH] [-h|--help]
+Usage: ./spamhaus-drop-nftables.sh [-d|--debug] [-l] [-q] [--curl-cmd PATH] [--log-level] [--log-prefix] [--jq-cmd PATH] [--max-retry INT] [--nft-cmd PATH] [--retry-delay INT] [-h|--help]
 
 Options:
   -d, --debug               Turn on debug for error messages
   -l                        Log rule matches
   -q                        Suppress final success message
+      --curl-cmd PATH       Path to curl executable
+                            (default: /usr/bin/curl)
       --log-level LEVEL     Set the filter's log level
                             (default: warn)
       --log-prefix PREFIX   Set the filter's log prefix
