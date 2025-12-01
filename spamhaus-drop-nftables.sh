@@ -133,11 +133,11 @@ check_requirements () {
         error "Incorrect user: must be root"
         return 1
     fi
-    if ! command -v ${NFT_CMD} >/dev/null 2>&1; then
+    if ! command -v "${NFT_CMD}" >/dev/null 2>&1; then
         error "nft command not present"
         return 1
     fi
-    if ! command -v ${JQ_CMD} >/dev/null 2>&1; then
+    if ! command -v "${JQ_CMD}" >/dev/null 2>&1; then
         error "jq command not present"
         return 1
     fi
