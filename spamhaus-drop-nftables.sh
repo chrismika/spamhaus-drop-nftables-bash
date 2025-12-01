@@ -4,6 +4,7 @@ set -uo pipefail
 # --- Parameter Defaults ---
 readonly DEFAULT_NFT_CMD="/usr/sbin/nft"
 readonly DEFAULT_JQ_CMD="/usr/bin/jq"
+readonly DEFAULT_CURL_CMD="/usr/bin/curl"
 readonly DEFAULT_LOG_PREFIX="DROP_List_Block"
 readonly DEFAULT_LOG_LEVEL="warn"
 readonly DEFAULT_DEBUG=false
@@ -13,6 +14,7 @@ readonly DEFAULT_LOG_FLAG=false
 # --- Working Variables (mutable) ---
 NFT_CMD="${DEFAULT_NFT_CMD}"
 JQ_CMD="${DEFAULT_JQ_CMD}"
+CURL_CMD="${DEFAULT_CURL_CMD}"
 LOG_PREFIX="${DEFAULT_LOG_PREFIX}"
 LOG_LEVEL="${DEFAULT_LOG_LEVEL}"
 DEBUG=${DEFAULT_DEBUG}
@@ -26,7 +28,7 @@ readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
 readonly CHAIN_IN_NAME="chain-drop-list-in"
 readonly CHAIN_OUT_NAME="chain-drop-list-out"
 readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
-readonly USAGE="Usage: $0 [-d|--debug] [-l] [-q] [--log-level] [--log-prefix] [--jq-cmd PATH] [--nft-cmd PATH] [-h|--help]"
+readonly USAGE="Usage: $0 [-d|--debug] [-l] [-q] [--curl-cmd PATH] [--log-level] [--log-prefix] [--jq-cmd PATH] [--nft-cmd PATH] [-h|--help]"
 readonly LOG_LEVEL_OPTIONS=("emerg" "alert" "crit" "err" "warn" "notice" "info" "debug")
 
 parse_args() {
@@ -44,6 +46,10 @@ parse_args() {
             -q)
                 QUIET=true
                 shift
+                ;;
+            --curl-cmd)
+                CURL_CMD="${2}"
+                shift 2
                 ;;
             --log-level)
                 LOG_LEVEL="${2}"
@@ -70,6 +76,8 @@ parse_args() {
                 echo "  -d, --debug               Turn on debug for error messages"
                 echo "  -l                        Log rule matches"
                 echo "  -q                        Suppress final success message"
+                echo "      --curl-cmd PATH       Path to curl executable"
+                echo "                            (default: $DEFAULT_CURL_CMD)"
                 echo "      --log-level LEVEL     Set the filter's log level"
                 echo "                            (default: ${DEFAULT_LOG_LEVEL})"
                 echo "      --log-prefix PREFIX   Set the filter's log prefix"
@@ -133,6 +141,10 @@ check_requirements () {
         error "jq command not present"
         return 1
     fi
+    if ! command -v "${CURL_CMD}" >/dev/null 2>&1; then
+        error "curl command not present"
+        return 1
+    fi
 }
 
 ensure_table () {
@@ -164,7 +176,7 @@ ensure_set () {
 
 populate_set () {
     local curl_output
-    curl_output=$(curl -fSLs "${DROP_LIST_URL}" 2>&1) 
+    curl_output=$(${CURL_CMD} -fSLs "${DROP_LIST_URL}" 2>&1) 
     if [[ $? -ne 0 ]]; then
         error "failed to download ${DROP_LIST_URL}: ${curl_output}"
         return 1
