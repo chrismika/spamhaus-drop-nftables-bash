@@ -1,6 +1,9 @@
 # spamhaus-drop-nftables-bash
 Deploy Spamhaus' DROP list to Linux using bash and nftables
 
+# Prerequisites
+spamhaus-drop-nftables.sh requires the `nft`, `curl`, and `jq` commands to be installed on the system.
+
 # Usage
 ```
 Usage: ./spamhaus-drop-nftables.sh [-d] [-l] [-q] [--curl-cmd] [--log-level] [--log-prefix] [--jq-cmd] [--max-retry] [--nft-cmd] [--retry-delay] [-h|--help]
