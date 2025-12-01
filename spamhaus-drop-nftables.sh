@@ -10,6 +10,8 @@ readonly DEFAULT_LOG_LEVEL="warn"
 readonly DEFAULT_DEBUG=false
 readonly DEFAULT_QUIET=false
 readonly DEFAULT_LOG_FLAG=false
+readonly DEFAULT_MAX_RETRY=5
+readonly DEFAULT_RETRY_DELAY=5
 
 # --- Working Variables (mutable) ---
 NFT_CMD="${DEFAULT_NFT_CMD}"
@@ -20,6 +22,8 @@ LOG_LEVEL="${DEFAULT_LOG_LEVEL}"
 DEBUG=${DEFAULT_DEBUG}
 QUIET=${DEFAULT_QUIET}
 LOG_FLAG=${DEFAULT_LOG_FLAG}
+MAX_RETRY=${DEFAULT_MAX_RETRY}
+RETRY_DELAY=${DEFAULT_RETRY_DELAY}
 
 # --- Global Constants ---
 readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
@@ -28,7 +32,7 @@ readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
 readonly CHAIN_IN_NAME="chain-drop-list-in"
 readonly CHAIN_OUT_NAME="chain-drop-list-out"
 readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
-readonly USAGE="Usage: $0 [-d|--debug] [-l] [-q] [--curl-cmd PATH] [--log-level] [--log-prefix] [--jq-cmd PATH] [--nft-cmd PATH] [-h|--help]"
+readonly USAGE="Usage: $0 [-d|--debug] [-l] [-q] [--curl-cmd PATH] [--log-level] [--log-prefix] [--jq-cmd PATH] [--max-retry INT] [--nft-cmd PATH] [--retry-delay INT] [-h|--help]"
 readonly LOG_LEVEL_OPTIONS=("emerg" "alert" "crit" "err" "warn" "notice" "info" "debug")
 
 parse_args() {
@@ -65,10 +69,27 @@ parse_args() {
                 JQ_CMD="${2}"
                 shift 2
                 ;;
+            --max-retry)
+                if [[ ! "${2}" =~ ^[0-9]+$ ]]; then
+                    error "--curl-max-retry must be a non-negative integer"
+                    return 1
+                fi
+                MAX_RETRY=${2}
+                shift 2
+                ;;
             --nft-cmd)
                 NFT_CMD="${2}"
                 shift 2
                 ;;
+            --retry-delay)
+                if [[ ! "${2}" =~ ^[1-9][0-9]*$ ]]; then
+                    error "--curl-retry-delay must be a positive integer"
+                    return 1
+                fi
+                RETRY_DELAY=${2}
+                shift 2
+                ;;
+
             -h|--help)
                 echo "${USAGE}"
                 echo
@@ -176,11 +197,20 @@ ensure_set () {
 
 populate_set () {
     local curl_output
-    curl_output=$(${CURL_CMD} -fSLs "${DROP_LIST_URL}" 2>&1) 
-    if [[ $? -ne 0 ]]; then
-        error "failed to download ${DROP_LIST_URL}: ${curl_output}"
-        return 1
-    fi
+    for ((i = 0; i < MAX_RETRY; i++)); do
+        curl_output=$(curl -fSLs "${DROP_LIST_URL}" 2>&1) 
+        if [[ $? -ne 0 ]]; then
+            if [[ ${i} -eq $((MAX_RETRY - 1)) ]]; then
+                error "failed to download ${DROP_LIST_URL}: ${curl_output}"
+                return 1
+            else
+                error "failed to download ${DROP_LIST_URL} (retrying - $((i + 1))/${MAX_RETRY}): ${curl_output}"
+                sleep "${RETRY_DELAY}"
+            fi
+        else
+            break
+        fi
+    done
     local error_message
     error_message=$(${NFT_CMD} add element inet "${TABLE_NAME}" "${SET_NAME}" \
       "{ $(printf "%s\n" "$curl_output" | grep -v "^;" | awk '{print $1}' | paste -sd "," -) }" 2>&1 >/dev/null)
