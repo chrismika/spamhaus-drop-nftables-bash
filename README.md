@@ -1,11 +1,39 @@
 # spamhaus-drop-nftables-bash
-Deploy Spamhaus' DROP list to Linux using bash and nftables
+Deploy Spamhaus' DROP list on Linux using `bash` and `nftables`.
 
-# Prerequisites
-spamhaus-drop-nftables.sh requires the `nft`, `curl`, and `jq` commands to be installed on the system.
+## Prerequisites
+The script `spamhaus-drop-nftables.sh` requires the following commands to be installed on the system:
+- `nft`
+- `curl`
+- `jq`
 
-# Usage
+To use the provided `Makefile`, `make` must also be installed.
+
+## Installation
+Use the provided `Makefile` to install and enable the `systemd` service and timer:
+
+```bash
+sudo make install
 ```
+
+Since `nftables` rules are not persistent across reboots, the `systemd` service and timer ensure the rules are applied at startup and the set is regularly updated.
+
+You can also run the script manually from anywhere:
+
+```bash
+sudo ./spamhaus-drop-nftables.sh
+```
+
+## Uninstallation
+To remove the service, timer, and related files:
+
+```bash
+sudo make uninstall
+```
+
+## Usage
+
+```bash
 Usage: ./spamhaus-drop-nftables.sh [-d] [-l] [-q] [--curl-cmd] [--log-level] [--log-prefix] [--jq-cmd] [--max-retry] [--nft-cmd] [--retry-delay] [-h|--help]
 
 Options:
