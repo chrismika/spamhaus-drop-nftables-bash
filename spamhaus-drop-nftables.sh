@@ -33,7 +33,6 @@ readonly CHAIN_IN_NAME="chain-drop-list-in"
 readonly CHAIN_OUT_NAME="chain-drop-list-out"
 readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
 readonly USAGE="Usage: $0 [-d] [-l] [-q] [--curl-cmd] [--log-level] [--log-prefix] [--jq-cmd] [--max-retry] [--nft-cmd] [--retry-delay] [-h|--help]"
-readonly LOG_LEVEL_OPTIONS=("emerg" "alert" "crit" "err" "warn" "notice" "info" "debug")
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
@@ -123,22 +122,11 @@ parse_args() {
     done
 }
 
-in_haystack() {
-    local needle="${1}"
-    shift
-    local haystack=("${@}")
-    for check in "${haystack[@]}"; do
-        if [[ "${needle}" == "${check}" ]]; then return 0; fi
-    done
-    return 1
-}
-
 log_setup () {
-    if [[ "${LOG_LEVEL}" != "${DEFAULT_LOG_LEVEL}" ]]; then
-        if ! in_haystack "${LOG_LEVEL}" "${LOG_LEVEL_OPTIONS[@]}"; then
-            error "Unknown log level: ${LOG_LEVEL}"
-            return 1
-        fi
+    local -rA LOG_LEVEL_OPTIONS=(["emerg"]=1 ["alert"]=1 ["crit"]=1 ["err"]=1 ["warn"]=1 ["notice"]=1  ["info"]=1  ["debug"]=1)
+    if ! [[ -v LOG_LEVEL_OPTIONS["${LOG_LEVEL}"] ]]; then
+        error "Unknown log level: ${LOG_LEVEL}"
+        return 1
     fi
     LOG_TXT="log prefix \"${LOG_PREFIX} \" level ${LOG_LEVEL}"
 }
