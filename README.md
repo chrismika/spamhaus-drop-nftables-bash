@@ -40,7 +40,7 @@ sudo make uninstall
 
 ## Usage
 
-```bash
+```
 Usage: ./spamhaus-drop-nftables.sh [options]
 
 Deploy Spamhaus' DROP list to Linux using bash and nftables.
