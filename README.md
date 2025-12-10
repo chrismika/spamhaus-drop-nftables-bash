@@ -41,7 +41,9 @@ sudo make uninstall
 ## Usage
 
 ```bash
-Usage: ./spamhaus-drop-nftables.sh [-d] [-l] [-q] [--curl-cmd] [--log-level] [--log-prefix] [--jq-cmd] [--max-retry] [--nft-cmd] [--retry-delay] [-h|--help]
+Usage: ./spamhaus-drop-nftables.sh [options]
+
+Deploy Spamhaus' DROP list to Linux using bash and nftables.
 
 Options:
   -d                        Turn on debug for error messages
