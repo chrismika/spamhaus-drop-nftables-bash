@@ -24,6 +24,13 @@ You can also run the script manually from anywhere:
 sudo ./spamhaus-drop-nftables.sh
 ```
 
+## Upgrading
+To upgrade just the script:
+
+```bash
+sudo make upgrade
+```
+
 ## Uninstallation
 To remove the service, timer, and related files:
 
