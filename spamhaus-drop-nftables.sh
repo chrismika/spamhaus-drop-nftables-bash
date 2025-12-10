@@ -32,7 +32,8 @@ readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
 readonly CHAIN_IN_NAME="chain-drop-list-in"
 readonly CHAIN_OUT_NAME="chain-drop-list-out"
 readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
-readonly USAGE="Usage: $0 [-d] [-l] [-q] [--curl-cmd] [--log-level] [--log-prefix] [--jq-cmd] [--max-retry] [--nft-cmd] [--retry-delay] [-h|--help]"
+readonly USAGE="Usage: $0 [options]"
+readonly LOG_LEVEL_OPTIONS=("emerg" "alert" "crit" "err" "warn" "notice" "info" "debug")
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
@@ -91,6 +92,8 @@ parse_args() {
 
             -h|--help)
                 echo "${USAGE}"
+                echo
+                echo "Deploy Spamhaus' DROP list to Linux using bash and nftables."
                 echo
                 echo "Options:"
                 echo "  -d                        Turn on debug for error messages"
