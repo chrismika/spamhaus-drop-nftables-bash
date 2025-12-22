@@ -10,7 +10,7 @@ The script `spamhaus-drop-nftables.sh` requires the following commands to be ins
 To use the provided `Makefile`, `make` must also be installed.
 
 ## Installation
-Use the provided `Makefile` to install and enable the `systemd` service and timer:
+Use the provided `Makefile` to install the script and enable the `systemd` service and timer:
 
 ```bash
 sudo make install
@@ -31,7 +31,7 @@ sudo ./spamhaus-drop-nftables.sh
 ```
 
 ## Uninstallation
-To remove the service, timer, and related files:
+To remove the script, service, timer, and related files:
 
 ```bash
 sudo make uninstall
