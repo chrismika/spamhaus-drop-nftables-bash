@@ -5,8 +5,8 @@ TIMER       := $(PKG_NAME).timer
 
 # Paths
 PREFIX      ?= /usr/local
-BINDIR      = $(DESTDIR)$(PREFIX)/sbin
-SYSTEMDDIR  = $(DESTDIR)/etc/systemd/system
+BINDIR      = $(PREFIX)/sbin
+SYSTEMDDIR  = /etc/systemd/system
 INSTALL     := install -p
 
 .PHONY: all install uninstall check-root
@@ -20,10 +20,10 @@ check-root:
 	@if [ "$$(id -u)" -ne 0 ]; then echo "Error: Run as root"; exit 1; fi
 
 install: check-root
-	$(INSTALL) -d $(BINDIR) $(SYSTEMDDIR)
-	$(INSTALL) -m 755 $(SCRIPT) $(BINDIR)/$(SCRIPT)
-	$(INSTALL) -m 644 $(SERVICE) $(SYSTEMDDIR)/$(SERVICE)
-	$(INSTALL) -m 644 $(TIMER) $(SYSTEMDDIR)/$(TIMER)
+	$(INSTALL) -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(SYSTEMDDIR)
+	$(INSTALL) -m 755 $(SCRIPT) $(DESTDIR)$(BINDIR)/$(SCRIPT)
+	$(INSTALL) -m 644 $(SERVICE) $(DESTDIR)$(SYSTEMDDIR)/$(SERVICE)
+	$(INSTALL) -m 644 $(TIMER) $(DESTDIR)$(SYSTEMDDIR)/$(TIMER)
 ifeq ($(DESTDIR),)
 	systemctl daemon-reload
 	systemctl enable --now $(TIMER)
@@ -35,7 +35,9 @@ ifeq ($(DESTDIR),)
 	systemctl disable --now $(TIMER) 2>/dev/null || true
 	systemctl disable --now $(SERVICE) 2>/dev/null || true
 endif
-	rm -f $(BINDIR)/$(SCRIPT) $(SYSTEMDDIR)/$(SERVICE) $(SYSTEMDDIR)/$(TIMER)
+	rm -f $(DESTDIR)$(BINDIR)/$(SCRIPT) \
+	$(DESTDIR)$(SYSTEMDDIR)/$(SERVICE) \
+	$(DESTDIR)$(SYSTEMDDIR)/$(TIMER)
 ifeq ($(DESTDIR),)
 	systemctl daemon-reload
 	systemctl reset-failed
