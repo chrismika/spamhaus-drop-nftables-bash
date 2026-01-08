@@ -192,7 +192,7 @@ ensure_set () {
 populate_set () {
     local curl_output
     for ((i = 0; i < MAX_RETRY; i++)); do
-        curl_output=$(curl -fSLs "${DROP_LIST_URL}" 2>&1) 
+        curl_output=$(${CURL_CMD} -fSLs "${DROP_LIST_URL}" 2>&1) 
         if [[ $? -ne 0 ]]; then
             if [[ ${i} -eq $((MAX_RETRY - 1)) ]]; then
                 error "failed to download ${DROP_LIST_URL}: ${curl_output}"
