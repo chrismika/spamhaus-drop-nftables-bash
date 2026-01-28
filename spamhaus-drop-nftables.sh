@@ -12,6 +12,8 @@ readonly DEFAULT_QUIET=false
 readonly DEFAULT_LOG_FLAG=false
 readonly DEFAULT_MAX_RETRY=5
 readonly DEFAULT_RETRY_DELAY=5
+readonly DEFAULT_CONNECT_TIMEOUT=10
+readonly DEFAULT_MAX_TIME=30
 
 # --- Working Variables (mutable) ---
 NFT_CMD="${DEFAULT_NFT_CMD}"
@@ -24,6 +26,8 @@ QUIET=${DEFAULT_QUIET}
 LOG_FLAG=${DEFAULT_LOG_FLAG}
 MAX_RETRY=${DEFAULT_MAX_RETRY}
 RETRY_DELAY=${DEFAULT_RETRY_DELAY}
+CONNECT_TIMEOUT=${DEFAULT_CONNECT_TIMEOUT}
+MAX_TIME=${DEFAULT_MAX_TIME}
 
 # --- Global Constants ---
 readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
@@ -49,6 +53,14 @@ parse_args() {
             -q)
                 QUIET=true
                 shift
+                ;;
+            --connect-timeout)
+                if [[ ! "${2}" =~ ^[1-9][0-9]*$ ]]; then
+                    error "--connect-timeout must be a positive integer"
+                    return 1
+                fi
+                CONNECT_TIMEOUT="${2}"
+                shift 2
                 ;;
             --curl-cmd)
                 CURL_CMD="${2}"
@@ -76,6 +88,14 @@ parse_args() {
                 MAX_RETRY=${2}
                 shift 2
                 ;;
+            --max-time)
+                if [[ ! "${2}" =~ ^[1-9][0-9]*$ ]]; then
+                    error "--max-time must be a positive integer"
+                    return 1
+                fi
+                MAX_TIME="${2}"
+                shift 2
+                ;;
             --nft-cmd)
                 NFT_CMD="${2}"
                 shift 2
@@ -95,24 +115,28 @@ parse_args() {
                 echo "Deploy Spamhaus' DROP list to Linux using bash and nftables."
                 echo
                 echo "Options:"
-                echo "  -d                        Turn on debug for error messages"
-                echo "  -l                        Log rule matches"
-                echo "  -q                        Suppress final success message"
-                echo "      --curl-cmd PATH       Path to curl executable"
-                echo "                            (default: $DEFAULT_CURL_CMD)"
-                echo "      --log-level LEVEL     Set the filter's log level"
-                echo "                            (default: ${DEFAULT_LOG_LEVEL})"
-                echo "      --log-prefix PREFIX   Set the filter's log prefix"
-                echo "                            (default: \"${DEFAULT_LOG_PREFIX}\")"
-                echo "      --jq-cmd PATH         Path to jq executable"
-                echo "                            (default: ${DEFAULT_JQ_CMD})"
-                echo "      --max-retry INT       Set the max number of download retries"
-                echo "                            (default: ${DEFAULT_MAX_RETRY})"
-                echo "      --nft-cmd PATH        Path to nft executable"
-                echo "                            (default: ${DEFAULT_NFT_CMD})"
-                echo "      --retry-delay INT     Set the delay between download retries"
-                echo "                            (default: ${DEFAULT_RETRY_DELAY})"
-                echo "  -h, --help                Print this help message"
+                echo "  -d                         Turn on debug for error messages"
+                echo "  -l                         Log rule matches"
+                echo "  -q                         Suppress final success message"
+                echo "      --connect-timeout INT  Set curl's connect-timeout value"
+                echo "                             (default: ${DEFAULT_CONNECT_TIMEOUT})"
+                echo "      --curl-cmd PATH        Path to curl executable"
+                echo "                             (default: $DEFAULT_CURL_CMD)"
+                echo "      --log-level LEVEL      Set the filter's log level"
+                echo "                             (default: ${DEFAULT_LOG_LEVEL})"
+                echo "      --log-prefix PREFIX    Set the filter's log prefix"
+                echo "                             (default: \"${DEFAULT_LOG_PREFIX}\")"
+                echo "      --jq-cmd PATH          Path to jq executable"
+                echo "                             (default: ${DEFAULT_JQ_CMD})"
+                echo "      --max-retry INT        Set the max number of download retries"
+                echo "                             (default: ${DEFAULT_MAX_RETRY})"
+                echo "      --max-time INT         Set curl's max-time value"
+                echo "                             (default: ${DEFAULT_MAX_TIME})"
+                echo "      --nft-cmd PATH         Path to nft executable"
+                echo "                             (default: ${DEFAULT_NFT_CMD})"
+                echo "      --retry-delay INT      Set the delay between download retries"
+                echo "                             (default: ${DEFAULT_RETRY_DELAY})"
+                echo "  -h, --help                 Print this help message"
                 return 1
                 ;;
             *)
@@ -190,22 +214,15 @@ ensure_set () {
 }
 
 populate_set () {
-    local curl_output
-    for ((i = 0; i < MAX_RETRY; i++)); do
-        curl_output=$(${CURL_CMD} -fSLs "${DROP_LIST_URL}" 2>&1) 
-        if [[ $? -ne 0 ]]; then
-            if [[ ${i} -eq $((MAX_RETRY - 1)) ]]; then
-                error "failed to download ${DROP_LIST_URL}: ${curl_output}"
-                return 1
-            else
-                error "failed to download ${DROP_LIST_URL} (retrying - $((i + 1))/${MAX_RETRY}): ${curl_output}"
-                sleep "${RETRY_DELAY}"
-            fi
-        else
-            break
-        fi
-    done
-    local error_message
+    local curl_output error_message
+    curl_output=$(${CURL_CMD} -fSLs \
+         --retry "${MAX_RETRY}" --retry-delay "${RETRY_DELAY}" --retry-all-errors \
+         --connect-timeout "${CONNECT_TIMEOUT}" --max-time "${MAX_TIME}" \
+        "${DROP_LIST_URL}" 2>&1) 
+    if [[ $? -ne 0 ]]; then
+        error "failed to download ${DROP_LIST_URL}: ${curl_output}"
+        return 1
+    fi
     error_message=$(${NFT_CMD} add element inet "${TABLE_NAME}" "${SET_NAME}" \
       "{ $(printf "%s\n" "$curl_output" | grep -v "^;" | awk '{print $1}' | paste -sd "," -) }" 2>&1 >/dev/null)
     if [[ $? -ne 0 ]]; then
