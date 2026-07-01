@@ -65,6 +65,12 @@ Options:
   -h, --help                Print this help message
 ```
 
+## Architecture 
+
+The script is a deliberately thin wrapper around nft: it fetches the DROP list, builds a single batch transaction, and executes it. By design there is very little logic outside the `nftables` interaction.
+
+`bash` is a purposeful choice, not a fallback. The set is defined with `flags interval` and `auto-merge` so that overlapping and adjacent CIDRs in the DROP list are squashed by the kernel. This only works when every element is added in one transaction: a single `nft add element ... { ... }` evaluates the full element list at once and merges overlaps in one operation. Some other languages, like Go, use libraries that apply element additions iteratively behind the scenes, so each new element is checked against an already-committed interval set and the overlaps raise a conflict instead of merging.
+
 ## Disclaimer
 The authors of this script are not affiliated with Spamhaus and are providing the script as a convenient wrapper for integrating the publicly available list.
 
