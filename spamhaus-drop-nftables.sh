@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2181  # $? idiom used deliberately for consistency; captures command exit status, not the assignment's
 set -uo pipefail
 
 # --- Parameter Defaults ---
@@ -37,6 +38,7 @@ readonly CHAIN_IN_NAME="chain-drop-list-in"
 readonly CHAIN_OUT_NAME="chain-drop-list-out"
 readonly LOG_DATE_FORMAT="+%b %d %H:%M:%S"
 readonly USAGE="Usage: $0 [options]"
+readonly LOCK_FILE="/run/spamhaus-drop-nftables.lock"
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
@@ -218,6 +220,17 @@ check_requirements () {
     fi
 }
 
+acquire_lock () {
+    exec {LOCK_FD}>"${LOCK_FILE}" || {
+        error "failed to open lock file ${LOCK_FILE}"
+        return 1
+    }
+    if ! flock -n "${LOCK_FD}"; then
+        echo "$(date "${LOG_DATE_FORMAT}") [info]: another instance running; skipping" >&2
+        exit 0
+    fi
+}
+
 ensure_table () {
     if ${NFT_CMD} list table inet "${TABLE_NAME}" >/dev/null 2>&1; then
         return 0
@@ -232,17 +245,17 @@ ensure_table () {
 }
 
 ensure_set () {
-  if ${NFT_CMD} list set inet "${TABLE_NAME}" "${SET_NAME}" >/dev/null 2>&1; then
-      return 0
-  else
-      local error_message
-      error_message=$(${NFT_CMD} add set inet "${TABLE_NAME}" "${SET_NAME}" \
-        "{ type ipv4_addr; flags interval; auto-merge; }" 2>&1 >/dev/null)
+    if ${NFT_CMD} list set inet "${TABLE_NAME}" "${SET_NAME}" >/dev/null 2>&1; then
+        return 0
+    else
+        local error_message
+        error_message=$(${NFT_CMD} add set inet "${TABLE_NAME}" "${SET_NAME}" \
+          "{ type ipv4_addr; flags interval; auto-merge; }" 2>&1 >/dev/null)
         if [[ $? -ne 0 ]]; then
             error "failed to add set ${SET_NAME}" "${error_message}"
             return 1
         fi
-  fi
+    fi
 }
 
 populate_set () {
@@ -339,12 +352,14 @@ delete_stale_sets () {
         error_message=$(${NFT_CMD} delete set inet "${TABLE_NAME}" handle "${i}" 2>&1 >/dev/null) 
         if [[ $? -ne 0 ]]; then
           error "failed to delete set handle ${i}" "${error_message}"
+          return 1
         fi
     done
 }
 
 main () {
     if ! check_requirements; then exit 1; fi
+    if ! acquire_lock; then exit 1; fi
     if ! ensure_table; then exit 1; fi
     if ! ensure_set; then exit 1; fi
     if ! populate_set; then exit 1; fi
