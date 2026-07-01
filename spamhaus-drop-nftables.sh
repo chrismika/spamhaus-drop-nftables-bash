@@ -55,7 +55,10 @@ parse_args() {
                 shift
                 ;;
             --connect-timeout)
-                if [[ ! "${2}" =~ ^[1-9][0-9]*$ ]]; then
+                if [[ $# -lt 2 ]]; then
+                    error "${1} requires an argument"
+                    return 1
+                elif [[ ! "${2}" =~ ^[1-9][0-9]*$ ]]; then
                     error "--connect-timeout must be a positive integer"
                     return 1
                 fi
@@ -63,33 +66,55 @@ parse_args() {
                 shift 2
                 ;;
             --curl-cmd)
+                if [[ $# -lt 2 ]]; then
+                    error "${1} requires an argument"
+                    return 1
+                fi
                 CURL_CMD="${2}"
                 shift 2
                 ;;
             --log-level)
+                if [[ $# -lt 2 ]]; then
+                    error "${1} requires an argument"
+                    return 1
+                fi
                 LOG_LEVEL="${2}"
                 if ! log_setup; then return 1; fi
                 shift 2
                 ;;
             --log-prefix)
+                if [[ $# -lt 2 ]]; then
+                    error "${1} requires an argument"
+                    return 1
+                fi
                 LOG_PREFIX="${2}"
                 if ! log_setup; then return 1; fi
                 shift 2
                 ;;
             --jq-cmd)
+                if [[ $# -lt 2 ]]; then
+                    error "${1} requires an argument"
+                    return 1
+                fi
                 JQ_CMD="${2}"
                 shift 2
                 ;;
             --max-retry)
-                if [[ ! "${2}" =~ ^[0-9]+$ ]]; then
-                    error "--curl-max-retry must be a non-negative integer"
+                if [[ $# -lt 2 ]]; then
+                    error "${1} requires an argument"
+                    return 1
+                elif [[ ! "${2}" =~ ^[0-9]+$ ]]; then
+                    error "--max-retry must be a non-negative integer"
                     return 1
                 fi
                 MAX_RETRY=${2}
                 shift 2
                 ;;
             --max-time)
-                if [[ ! "${2}" =~ ^[1-9][0-9]*$ ]]; then
+                if [[ $# -lt 2 ]]; then
+                    error "${1} requires an argument"
+                    return 1
+                elif [[ ! "${2}" =~ ^[1-9][0-9]*$ ]]; then
                     error "--max-time must be a positive integer"
                     return 1
                 fi
@@ -97,12 +122,19 @@ parse_args() {
                 shift 2
                 ;;
             --nft-cmd)
+                if [[ $# -lt 2 ]]; then
+                    error "${1} requires an argument"
+                    return 1
+                fi
                 NFT_CMD="${2}"
                 shift 2
                 ;;
             --retry-delay)
-                if [[ ! "${2}" =~ ^[1-9][0-9]*$ ]]; then
-                    error "--curl-retry-delay must be a positive integer"
+                if [[ $# -lt 2 ]]; then
+                    error "${1} requires an argument"
+                    return 1
+                elif [[ ! "${2}" =~ ^[1-9][0-9]*$ ]]; then
+                    error "--retry-delay must be a positive integer"
                     return 1
                 fi
                 RETRY_DELAY=${2}
@@ -137,7 +169,7 @@ parse_args() {
                 echo "      --retry-delay INT      Set the delay between download retries"
                 echo "                             (default: ${DEFAULT_RETRY_DELAY})"
                 echo "  -h, --help                 Print this help message"
-                return 1
+                exit 0
                 ;;
             *)
                 echo "Unknown argument: ${1}"
@@ -220,7 +252,7 @@ populate_set () {
          --connect-timeout "${CONNECT_TIMEOUT}" --max-time "${MAX_TIME}" \
         "${DROP_LIST_URL}" 2>&1) 
     if [[ $? -ne 0 ]]; then
-        error "failed to download ${DROP_LIST_URL}: ${curl_output}"
+        error "failed to download ${DROP_LIST_URL}" "${curl_output}"
         return 1
     fi
     error_message=$(${NFT_CMD} add element inet "${TABLE_NAME}" "${SET_NAME}" \
@@ -252,6 +284,7 @@ ensure_chain () {
           "{ type filter hook ${hook_point} priority filter -1; policy accept; }" 2>&1 >/dev/null) 
         if [[ $? -ne 0 ]]; then
             error "failed to add chain ${chain_name}" "${error_message}"
+            return 1
         fi
     fi
 }
