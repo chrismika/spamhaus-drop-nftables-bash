@@ -259,7 +259,7 @@ ensure_set () {
 }
 
 populate_set () {
-    local curl_output elements error_message
+    local curl_output parsed elements error_message
     curl_output=$(${CURL_CMD} -fSLs \
          --retry "${MAX_RETRY}" --retry-delay "${RETRY_DELAY}" --retry-all-errors \
          --connect-timeout "${CONNECT_TIMEOUT}" --max-time "${MAX_TIME}" \
@@ -268,11 +268,12 @@ populate_set () {
         error "failed to download ${DROP_LIST_URL}" "${curl_output}"
         return 1
     fi
-    elements=$(${JQ_CMD} -r 'select(.cidr != null) | .cidr' <<< "${curl_output}" | paste -sd "," -)
+    parsed=$(${JQ_CMD} -r 'select(.cidr != null) | .cidr' <<< "${curl_output}" 2>&1)
     if [[ $? -ne 0 ]]; then
-        error "failed to parse drop list JSON"
+        error "failed to parse drop list JSON" "${parsed}"
         return 1
     fi
+    elements=$(paste -sd "," - <<< "${parsed}")
     if [[ -z "${elements}" ]]; then
         error "drop list parsed to zero elements; refusing to apply empty set"
         return 1
