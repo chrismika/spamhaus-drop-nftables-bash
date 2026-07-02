@@ -31,7 +31,7 @@ CONNECT_TIMEOUT=${DEFAULT_CONNECT_TIMEOUT}
 MAX_TIME=${DEFAULT_MAX_TIME}
 
 # --- Global Constants ---
-readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop.txt"
+readonly DROP_LIST_URL="https://www.spamhaus.org/drop/drop_v4.json"
 readonly TABLE_NAME="table-spamhaus-drop-list"
 readonly SET_NAME="set-spamhaus-drop-list-$(date +%Y%m%d%H%M%S)"
 readonly CHAIN_IN_NAME="chain-drop-list-in"
@@ -259,7 +259,7 @@ ensure_set () {
 }
 
 populate_set () {
-    local curl_output error_message
+    local curl_output parsed elements error_message
     curl_output=$(${CURL_CMD} -fSLs \
          --retry "${MAX_RETRY}" --retry-delay "${RETRY_DELAY}" --retry-all-errors \
          --connect-timeout "${CONNECT_TIMEOUT}" --max-time "${MAX_TIME}" \
@@ -268,8 +268,17 @@ populate_set () {
         error "failed to download ${DROP_LIST_URL}" "${curl_output}"
         return 1
     fi
-    error_message=$(${NFT_CMD} add element inet "${TABLE_NAME}" "${SET_NAME}" \
-      "{ $(printf "%s\n" "$curl_output" | grep -v "^;" | awk '{print $1}' | paste -sd "," -) }" 2>&1 >/dev/null)
+    parsed=$(${JQ_CMD} -r 'select(.cidr != null) | .cidr' <<< "${curl_output}" 2>&1)
+    if [[ $? -ne 0 ]]; then
+        error "failed to parse drop list JSON" "${parsed}"
+        return 1
+    fi
+    elements=$(paste -sd "," - <<< "${parsed}")
+    if [[ -z "${elements}" ]]; then
+        error "drop list parsed to zero elements; refusing to apply empty set"
+        return 1
+    fi
+    error_message=$(${NFT_CMD} add element inet "${TABLE_NAME}" "${SET_NAME}" "{ ${elements} }" 2>&1 >/dev/null)
     if [[ $? -ne 0 ]]; then
         error "failed to add elements to set ${SET_NAME}" "${error_message}"
         return 1
