@@ -71,6 +71,8 @@ The script is a deliberately thin wrapper around nft: it fetches the DROP list, 
 
 `bash` is a purposeful choice, not a fallback. The set is defined with `flags interval` and `auto-merge` so that overlapping and adjacent CIDRs in the DROP list are squashed by the kernel. This only works when every element is added in one transaction: a single `nft add element ... { ... }` evaluates the full element list at once and merges overlaps in one operation. Some other languages, like Go, use libraries that apply element additions iteratively behind the scenes, so each new element is checked against an already-committed interval set and the overlaps raise a conflict instead of merging.
 
+This script is IPv4-only by design. Spamhaus publishes a separate IPv6 DROP list, but it isn't handled here, so on a dual-stack host, IPv6 traffic to and from listed ranges won't be blocked.
+
 ## Disclaimer
 The authors of this script are not affiliated with Spamhaus and are providing the script as a convenient wrapper for integrating the publicly available list.
 
